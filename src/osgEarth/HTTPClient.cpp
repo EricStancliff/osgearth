@@ -1401,35 +1401,34 @@ namespace
     getReader( const std::string& url, const HTTPResponse& response )
     {
         osgDB::ReaderWriter* reader = 0L;
-
-        // try extension first:
-        std::string ext = osgDB::getFileExtension( url );
-        if ( !ext.empty() )
-        {
-            reader = osgDB::Registry::instance()->getReaderWriterForExtension( ext );
-        }
+		
+		// try to look up a reader by mime-type first:
+		std::string mimeType = response.getMimeType();
+		if (!mimeType.empty())
+		{
+			reader = osgDB::Registry::instance()->getReaderWriterForMimeType(mimeType);
+		}
 
         if ( !reader )
         {
-            // try to look up a reader by mime-type first:
-            std::string mimeType = response.getMimeType();
-            if ( !mimeType.empty() )
-            {
-                reader = osgDB::Registry::instance()->getReaderWriterForMimeType(mimeType);
-            }
-        }
+			// try extension first:
+			std::string ext = osgDB::getFileExtension(url);
+			if (!ext.empty())
+			{
+				reader = osgDB::Registry::instance()->getReaderWriterForExtension(ext);
+			}
+			if (!reader && s_HTTP_DEBUG)
+			{
+				OE_WARN << LC << "Cannot find an OSG plugin to read response data (ext="
+					<< ext << "; mime-type=" << response.getMimeType()
+					<< ")" << std::endl;
 
-        if ( !reader && s_HTTP_DEBUG )
-        {
-            OE_WARN << LC << "Cannot find an OSG plugin to read response data (ext="
-                << ext << "; mime-type=" << response.getMimeType()
-                << ")" << std::endl;
-
-            if ( endsWith(response.getMimeType(), "xml", false) && response.getNumParts() > 0 )
-            {
-                OE_WARN << LC << "Content:\n" << response.getPartAsString(0) << "\n";
-            }
-        }
+				if (endsWith(response.getMimeType(), "xml", false) && response.getNumParts() > 0)
+				{
+					OE_WARN << LC << "Content:\n" << response.getPartAsString(0) << "\n";
+				}
+			}
+		}
 
         return reader;
     }
