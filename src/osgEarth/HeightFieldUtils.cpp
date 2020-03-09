@@ -274,6 +274,60 @@ HeightFieldUtils::getHeightAtLocation(const osg::HeightField* hf, double x, doub
     //Determine the pixel to sample
     double px = osg::clampBetween( (x - llx) / dx, 0.0, (double)(hf->getNumColumns()-1) );
     double py = osg::clampBetween( (y - lly) / dy, 0.0, (double)(hf->getNumRows()-1) );
+    
+    //NGTS Interpoliation
+    if (/*interpolation == INTERP_BILINEAR*/0)
+    {
+        double c = px;
+        double r = py;
+        float result = 0.0f;
+        int rowMin = osg::maximum((int)floor(r), 0);
+        int rowMax = osg::maximum(osg::minimum((int)ceil(r), (int)(hf->getNumRows() - 1)), 0);
+        int colMin = osg::maximum((int)floor(c), 0);
+        int colMax = osg::maximum(osg::minimum((int)ceil(c), (int)(hf->getNumColumns() - 1)), 0);
+
+        if (rowMin > rowMax) rowMin = rowMax;
+        if (colMin > colMax) colMin = colMax;
+
+        float urHeight = hf->getHeight(colMax, rowMax);
+        float llHeight = hf->getHeight(colMin, rowMin);
+        float ulHeight = hf->getHeight(colMin, rowMax);
+        float lrHeight = hf->getHeight(colMax, rowMin);
+
+        //Make sure not to use NoData in the interpolation
+        if (!validateSamples(urHeight, llHeight, ulHeight, lrHeight))
+        {
+            return NO_DATA_VALUE;
+        }
+
+        if ((colMax == colMin) && (rowMax == rowMin))
+        {
+            //OE_NOTICE << "Exact value" << std::endl;
+            result = hf->getHeight((int)c, (int)r);
+        }
+        else
+        {
+            double fx = (x - llx - (dx * (double)colMin)) / dx;
+            double fy = (y - lly - (dy * (double)rowMin)) / dy;
+
+            //result =
+            //    (1. - fy)*(1. - fx)*llHeight +
+            //    (1. - fy)*(fx)*lrHeight +
+            //    (fy)*(1. - fx)*ulHeight +
+            //    (fy)*(fx)*urHeight
+            //    ;
+            result =
+                (1. - fx)*(1. - fy) * llHeight +  //x, y
+                (1. - fx)*(     fy) * lrHeight +  //x, y+1
+                (     fx)*(1. - fy) * ulHeight +  //x+1, y
+                (     fx)*(     fy) * urHeight    //x+1, y+1
+                ;
+
+        }
+        return result;
+    }
+    
+    
     return getHeightAtPixel(hf, px, py, interpolation);
 }
 
